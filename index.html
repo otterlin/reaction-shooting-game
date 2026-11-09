@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>神槍手反射實驗室｜射擊反應時間測定遊戲</title>
+  <style>
+    :root {
+      --bg-dark: #0b101b;
+      --bg-panel: rgba(18, 26, 42, 0.88);
+      --accent-cyan: #00f0ff;
+      --accent-amber: #ffae00;
+      --accent-red: #ff3b5c;
+      --accent-green: #00e676;
+      --text-main: #f0f6fc;
+      --text-muted: #8b9bb4;
+      --border-glow: rgba(0, 240, 255, 0.28);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background: radial-gradient(circle at 50% 35%, #162238 0%, #090d16 75%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top HUD Header */
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 24px;
+      background: rgba(10, 15, 26, 0.92);
+      border-bottom: 1px solid var(--border-glow);
+      backdrop-filter: blur(10px);
+      z-index: 20;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border: 2px solid var(--accent-cyan);
+      border-radius: 50%;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+    }
+    .brand-icon::before, .brand-icon::after {
+      content: "";
+      position: absolute;
+      background: var(--accent-cyan);
+    }
+    .brand-icon::before { width: 100%; height: 2px; }
+    .brand-icon::after { width: 2px; height: 100%; }
+    .brand-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent-red);
+      border-radius: 50%;
+      z-index: 1;
+    }
+
+    .brand h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      background: linear-gradient(90deg, #ffffff, var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    /* Live 5-Round Scoreboard in Header */
+    .hud-rounds {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .round-slot {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 6px 12px;
+      min-width: 82px;
+      text-align: center;
+      transition: all 0.25s ease;
+    }
+
+    .round-slot.active {
+      border-color: var(--accent-amber);
+      box-shadow: 0 0 10px rgba(255, 174, 0, 0.35);
+      background: rgba(255, 174, 0, 0.1);
+    }
+
+    .round-slot.done {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 240, 255, 0.08);
+    }
+
+    .round-slot .label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .round-slot .val {
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--text-main);
+    }
+
+    .round-slot.done .val {
+      color: var(--accent-cyan);
+    }
+
+    .avg-slot {
+      background: linear-gradient(135deg, rgba(0, 230, 118, 0.15), rgba(0, 240, 255, 0.15));
+      border: 1px solid var(--accent-green);
+      border-radius: 8px;
+      padding: 6px 14px;
+      min-width: 105px;
+      text-align: center;
+    }
+
+    .avg-slot .label {
+      font-size: 0.7rem;
+      color: #a3f7cb;
+      display: block;
+    }
+
+    .avg-slot .val {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--accent-green);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hud-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn-icon {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 240, 255, 0.12);
+    }
+
+    /* Main Shooting Arena */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #arena {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      min-height: 460px;
+      cursor: crosshair;
+      overflow: hidden;
+      /* Tactical Range Grid */
+      background-image:
+        linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      background-position: center center;
+    }
+
+    #arena.waiting {
+      background-color: rgba(255, 174, 0, 0.03);
+    }
+
+    #arena.foul {
+      background-color: rgba(255, 59, 92, 0.15);
+      animation: shake 0.35s ease;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px); }
+      40% { transform: translateX(8px); }
+      60% { transform: translateX(-5px); }
+      80% { transform: translateX(5px); }
+    }
+
+    /* Status Banner inside Arena */
+    .arena-status {
+      position: absolute;
+      top: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 22px;
+      border-radius: 999px;
+      background: rgba(10, 15, 28, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-size: 0.95rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+
+    .status-dot.standby { background: var(--accent-amber); box-shadow: 0 0 8px var(--accent-amber); }
+    .status-dot.fire { background: var(--accent-green); box-shadow: 0 0 10px var(--accent-green); }
+    .status-dot.danger { background: var(--accent-red); box-shadow: 0 0 10px var(--accent-red); }
+
+    /* Target Style */
+    #target {
+      position: absolute;
+      width: 96px;
+      height: 96px;
+      transform: translate(-50%, -50%) scale(0);
+      border-radius: 50%;
+      pointer-events: none;
+      display: none;
+      z-index: 12;
+      cursor: crosshair;
+    }
+
+    #target.active {
+      display: block;
+      pointer-events: auto;
+      animation: popTarget 0.09s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes popTarget {
+      0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0.5; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+
+    .target-rings {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      position: relative;
+      background: radial-gradient(
+        circle,
+        #ff2a55 0%,
+        #ff2a55 18%,
+        #ffffff 19%,
+        #ffffff 36%,
+        #ff2a55 37%,
+        #ff2a55 56%,
+        #ffffff 57%,
+        #ffffff 76%,
+        #00f0ff 77%,
+        #00b8d4 100%
+      );
+      box-shadow:
+        0 0 25px rgba(0, 240, 255, 0.75),
+        0 0 50px rgba(255, 42, 85, 0.45);
+      border: 2px solid #ffffff;
+    }
+
+    .target-rings::before, .target-rings::after {
+      content: "";
+      position: absolute;
+      background: rgba(11, 16, 27, 0.35);
+      pointer-events: none;
+    }
+    .target-rings::before {
+      top: 50%; left: 10%; width: 80%; height: 1px;
+    }
+    .target-rings::after {
+      left: 50%; top: 10%; width: 1px; height: 80%;
+    }
+
+    /* Hit Floating Score / Time */
+    .hit-marker {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 15;
+      text-align: center;
+      animation: floatUp 0.85s ease-out forwards;
+    }
+
+    .hit-marker .time-tag {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--accent-green);
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+      display: block;
+    }
+
+    .hit-marker .acc-tag {
+      font-size: 0.75rem;
+      color: var(--accent-cyan);
+      background: rgba(11, 16, 27, 0.85);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 240, 255, 0.4);
+    }
+
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translate(-50%, -50%) scale(0.9); }
+      30% { opacity: 1; transform: translate(-50%, -75%) scale(1.05); }
+      100% { opacity: 0; transform: translate(-50%, -120%) scale(1); }
+    }
+
+    /* Bullet Hole / Ripple Effect */
+    .shot-ripple {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border: 2px solid var(--accent-amber);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 11;
+      animation: rippleOut 0.45s ease-out forwards;
+    }
+
+    @keyframes rippleOut {
+      0% { width: 10px; height: 10px; opacity: 1; }
+      100% { width: 70px; height: 70px; opacity: 0; }
+    }
+
+    /* Overlay Modal Card (Start & Results) */
+    .overlay-card {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glow);
+      border-radius: 16px;
+      padding: 28px 32px;
+      width: min(92%, 540px);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(14px);
+      z-index: 25;
+      text-align: center;
+    }
+
+    .overlay-card.hidden {
+      display: none;
+    }
+
+    .overlay-card h2 {
+      font-size: 1.55rem;
+      margin-bottom: 8px;
+      color: #ffffff;
+    }
+
+    .overlay-card .subtitle {
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .rules-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 22px;
+      text-align: left;
+    }
+
+    .rule-item {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 12px;
+      border-radius: 10px;
+    }
+
+    .rule-item strong {
+      display: block;
+      color: var(--accent-cyan);
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+    }
+
+    .rule-item span {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.35;
+      display: block;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #00f0ff, #0088ff);
+      color: #06101e;
+      font-weight: 800;
+      font-size: 1.05rem;
+      padding: 13px 32px;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.45);
+      transition: transform 0.15s, box-shadow 0.15s;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 28px rgba(0, 240, 255, 0.75);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    /* Results Breakdown */
+    .result-hero {
+      background: rgba(0, 230, 118, 0.08);
+      border: 1px solid rgba(0, 230, 118, 0.35);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .result-hero .avg-label {
+      font-size: 0.82rem;
+      color: #a3f7cb;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .result-hero .avg-big {
+      font-size: 2.5rem;
+      font-weight: 900;
+      color: var(--accent-green);
+      font-variant-numeric: tabular-nums;
+      margin: 4px 0;
+    }
+
+    .rank-badge {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      background: rgba(0, 240, 255, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid var(--accent-cyan);
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .stat-box {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .stat-box .s-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .stat-box .s-val {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Bar Chart for 5 Trials */
+    .chart-box {
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 14px 12px 10px;
+      margin-bottom: 18px;
+    }
+
+    .chart-title {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .bars-wrap {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-around;
+      height: 92px;
+      gap: 10px;
+      padding-top: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .bar-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100%;
+      justify-content: flex-end;
+    }
+
+    .bar-num {
+      font-size: 0.72rem;
+      color: var(--text-main);
+      margin-bottom: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bar-fill {
+      width: 100%;
+      max-width: 38px;
+      background: linear-gradient(180deg, var(--accent-cyan), #0066ff);
+      border-radius: 4px 4px 0 0;
+      transition: height 0.4s ease;
+      min-height: 6px;
+    }
+
+    .bar-col-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* History Log Footer */
+    footer {
+      background: rgba(9, 13, 22, 0.95);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 10px 24px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .history-pills {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      max-width: 100%;
+    }
+
+    .history-pill {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      color: var(--text-main);
+    }
+
+    @media (max-width: 640px) {
+      .rules-grid {
+        grid-template-columns: 1fr;
+      }
+      header {
+        padding: 10px 14px;
+      }
+      .round-slot {
+        min-width: 60px;
+        padding: 4px 8px;
+      }
+      #target {
+        width: 84px;
+        height: 84px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon"><div class="brand-dot"></div></div>
+      <div>
+        <h1>神槍手反射實驗室</h1>
+        <p>視覺神經反應時間測定（5次射擊平均統計）</p>
+      </div>
+    </div>
+
+    <div class="hud-rounds" id="hudRounds">
+      <div class="round-slot" id="slot-0"><span class="label">第 1 發</span><span class="val">--</span></div>
+      <div class="round-slot" id="slot-1"><span class="label">第 2 發</span><span class="val">--</span></div>
+      <div class="round-slot" id="slot-2"><span class="label">第 3 發</span><span class="val">--</span></div>
+      <div class="round-slot" id="slot-3"><span class="label">第 4 發</span><span class="val">--</span></div>
+      <div class="round-slot" id="slot-4"><span class="label">第 5 發</span><span class="val">--</span></div>
+      <div class="avg-slot">
+        <span class="label">5次平均時間</span>
+        <span class="val" id="hudAvg">-- ms</span>
+      </div>
+    </div>
+
+    <div class="hud-controls">
+      <button class="btn-icon" id="soundToggleBtn" title="切換音效">🔊 音效開啟</button>
+      <button class="btn-icon" id="restartTopBtn" title="重新開始五次測定">↺ 重新測定</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="arena">
+      <div class="arena-status" id="arenaStatus">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">準備就緒：點擊下方按鈕開始五次射擊反應測定</span>
+      </div>
+
+      <!-- Pop-up Target -->
+      <div id="target" role="button" aria-label="射擊標靶">
+        <div class="target-rings"></div>
+      </div>
+
+      <!-- Start Card -->
+      <div class="overlay-card" id="startCard">
+        <h2>🎯 射擊反應時間測定</h2>
+        <p class="subtitle">
+          測量從「視覺接收標靶出現」經大腦處理到「手指點擊射擊」所需的反應時間。<br/>
+          每輪共進行 <strong>5 次射擊</strong>，系統將自動計算您的平均反應時間與穩定度。
+        </p>
+
+        <div class="rules-grid">
+          <div class="rule-item">
+            <strong>1. 隨機等待</strong>
+            <span>每發標靶會在 1.2～3.5 秒內隨機位置彈出。</span>
+          </div>
+          <div class="rule-item">
+            <strong>2. 迅速點選</strong>
+            <span>標靶出現瞬間立即點選靶心，精確記錄毫秒（ms）。</span>
+          </div>
+          <div class="rule-item">
+            <strong>3. 嚴禁搶快</strong>
+            <span>標靶未出現前提前開槍視為違規，該發將重新計時。</span>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="startBtn">開始 5 次射擊測定</button>
+      </div>
+
+      <!-- Results Modal Card -->
+      <div class="overlay-card hidden" id="resultCard">
+        <h2>📊 五次射擊反應統計報告</h2>
+        <p class="subtitle" id="resultSubtitle">已完成全部 5 次靶場反應時間測定</p>
+
+        <div class="result-hero">
+          <div class="avg-label">五次測量平均反應時間</div>
+          <div class="avg-big" id="finalAvgText">0.0 ms</div>
+          <span class="rank-badge" id="rankBadge">評定中</span>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-box">
+            <div class="s-label">⚡ 最快反應</div>
+            <div class="s-val" id="bestTimeText">-- ms</div>
+          </div>
+          <div class="stat-box">
+            <div class="s-label">🐢 最慢反應</div>
+            <div class="s-val" id="worstTimeText">-- ms</div>
+          </div>
+          <div class="stat-box">
+            <div class="s-label">🎯 平均準度</div>
+            <div class="s-val" id="avgAccText">-- Ring</div>
+          </div>
+        </div>
+
+        <div class="chart-box">
+          <div class="chart-title">
+            <span>各發反應時間分佈 (ms)</span>
+            <span id="sdText">標準差: -- ms</span>
+          </div>
+          <div class="bars-wrap" id="barsWrap"></div>
+        </div>
+
+        <div class="action-row">
+          <button class="btn-primary" id="playAgainBtn">再測一輪 (5次)</button>
+          <button class="btn-icon" id="copyReportBtn">📋 複製實驗數據</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div>💡 科學小知識：一般人類視覺反應時間約落在 <strong>200 ms ～ 300 ms</strong> 之間。</div>
+    <div class="history-pills" id="historyPills">
+      <span>歷次平均紀錄：尚無紀錄</span>
+    </div>
+  </footer>
+
+  <script>
+    const TOTAL_ROUNDS = 5;
+    let currentRound = 0;
+    let reactionTimes = [];
+    let accuracyScores = [];
+    let sessionHistory = [];
+
+    let gameState = 'IDLE'; // IDLE, WAITING, TARGET_ACTIVE, FINISHED
+    let waitTimerId = null;
+    let targetAppearedAt = 0;
+    let soundEnabled = true;
+    let audioCtx = null;
+
+    // DOM Elements
+    const arena = document.getElementById('arena');
+    const target = document.getElementById('target');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const startCard = document.getElementById('startCard');
+    const resultCard = document.getElementById('resultCard');
+    const startBtn = document.getElementById('startBtn');
+    const playAgainBtn = document.getElementById('playAgainBtn');
+    const restartTopBtn = document.getElementById('restartTopBtn');
+    const soundToggleBtn = document.getElementById('soundToggleBtn');
+    const copyReportBtn = document.getElementById('copyReportBtn');
+    const hudAvg = document.getElementById('hudAvg');
+    const historyPills = document.getElementById('historyPills');
+
+    // Web Audio Synthesizer for crisp shooting & target sounds
+    function ensureAudio() {
+      if (!soundEnabled) return null;
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) audioCtx = new AudioContextClass();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playSound(type) {
+      const ctx = ensureAudio();
+      if (!ctx) return;
+
+      const now = ctx.currentTime;
+      if (type === 'pop') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.065);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.07);
+      } else if (type === 'shot') {
+        // Noise burst + punchy low sweep for laser/gun hit
+        const bufferSize = ctx.sampleRate * 0.09;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.025));
+        }
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1200, now);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        noise.start(now);
+
+        const osc = ctx.createOscillator();
+        const oscGain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(65, now + 0.08);
+        oscGain.gain.setValueAtTime(0.28, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.085);
+        osc.connect(oscGain);
+        oscGain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.085);
+      } else if (type === 'foul') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(170, now);
+        osc.frequency.setValueAtTime(130, now + 0.1);
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      } else if (type === 'finish') {
+        const notes = [523.25, 659.25, 783.99, 1046.5];
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+          gain.gain.setValueAtTime(0.18, now + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.22);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + idx * 0.08);
+          osc.stop(now + idx * 0.08 + 0.22);
+        });
+      }
+    }
+
+    function setStatus(mode, message) {
+      statusDot.className = 'status-dot ' + mode;
+      statusText.textContent = message;
+    }
+
+    function updateHUD() {
+      for (let i = 0; i < TOTAL_ROUNDS; i++) {
+        const slot = document.getElementById(`slot-${i}`);
+        const valSpan = slot.querySelector('.val');
+        slot.classList.remove('active', 'done');
+        if (i < reactionTimes.length) {
+          slot.classList.add('done');
+          valSpan.textContent = `${Math.round(reactionTimes[i])} ms`;
+        } else if (i === currentRound && (gameState === 'WAITING' || gameState === 'TARGET_ACTIVE')) {
+          slot.classList.add('active');
+          valSpan.textContent = '瞄準中...';
+        } else {
+          valSpan.textContent = '--';
+        }
+      }
+
+      if (reactionTimes.length > 0) {
+        const avg = reactionTimes.reduce((a, b) => a + b, 0) / reactionTimes.length;
+        hudAvg.textContent = `${avg.toFixed(1)} ms`;
+      } else {
+        hudAvg.textContent = '-- ms';
+      }
+    }
+
+    function startSession() {
+      clearTimeout(waitTimerId);
+      currentRound = 0;
+      reactionTimes = [];
+      accuracyScores = [];
+      startCard.classList.add('hidden');
+      resultCard.classList.add('hidden');
+      target.classList.remove('active');
+      updateHUD();
+      scheduleNextTarget();
+    }
+
+    function scheduleNextTarget() {
+      clearTimeout(waitTimerId);
+      target.classList.remove('active');
+      gameState = 'WAITING';
+      arena.classList.add('waiting');
+      arena.classList.remove('foul');
+
+      updateHUD();
+      setStatus('standby', `第 ${currentRound + 1} / ${TOTAL_ROUNDS} 發：屏息瞄準，等待標靶出現...`);
+
+      // Random delay between 1200ms and 3400ms
+      const randomDelay = 1200 + Math.random() * 2200;
+      waitTimerId = setTimeout(() => {
+        spawnTarget();
+      }, randomDelay);
+    }
+
+    function spawnTarget() {
+      const rect = arena.getBoundingClientRect();
+      const padX = 72;
+      const padTop = 90;
+      const padBottom = 72;
+
+      const minX = padX;
+      const maxX = Math.max(padX + 20, rect.width - padX);
+      const minY = padTop;
+      const maxY = Math.max(padTop + 20, rect.height - padBottom);
+
+      const x = minX + Math.random() * (maxX - minX);
+      const y = minY + Math.random() * (maxY - minY);
+
+      target.style.left = `${x}px`;
+      target.style.top = `${y}px`;
+
+      // Synchronize timestamp with actual paint frame
+      requestAnimationFrame(() => {
+        target.classList.add('active');
+        arena.classList.remove('waiting');
+        gameState = 'TARGET_ACTIVE';
+        targetAppearedAt = performance.now();
+        playSound('pop');
+        setStatus('fire', `🔥 標靶出現！立即射擊！（第 ${currentRound + 1} / ${TOTAL_ROUNDS} 發）`);
+      });
+    }
+
+    function spawnRippleAndMarker(x, y, text, subtext) {
+      const ripple = document.createElement('div');
+      ripple.className = 'shot-ripple';
+      ripple.style.left = `${x}px`;
+      ripple.style.top = `${y}px`;
+      arena.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 460);
+
+      if (text) {
+        const marker = document.createElement('div');
+        marker.className = 'hit-marker';
+        marker.style.left = `${x}px`;
+        marker.style.top = `${y}px`;
+        marker.innerHTML = `<span class="time-tag">${text}</span><span class="acc-tag">${subtext}</span>`;
+        arena.appendChild(marker);
+        setTimeout(() => marker.remove(), 860);
+      }
+    }
+
+    // Handle clicking the target
+    target.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      if (gameState !== 'TARGET_ACTIVE') return;
+
+      const hitTime = performance.now();
+      const rt = Math.max(1, hitTime - targetAppearedAt);
+
+      // Calculate ring accuracy (distance from center of target)
+      const tRect = target.getBoundingClientRect();
+      const centerX = tRect.left + tRect.width / 2;
+      const centerY = tRect.top + tRect.height / 2;
+      const dist = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+      const radius = tRect.width / 2;
+      const ratio = Math.min(1, dist / radius);
+      const ringScore = Math.max(6, Math.round(10 - ratio * 4)); // 6 to 10 rings
+
+      const arenaRect = arena.getBoundingClientRect();
+      const localX = e.clientX - arenaRect.left;
+      const localY = e.clientY - arenaRect.top;
+
+      playSound('shot');
+      target.classList.remove('active');
+      gameState = 'IDLE';
+
+      reactionTimes.push(rt);
+      accuracyScores.push(ringScore);
+
+      const ringLabel = ringScore === 10 ? '🎯 正中紅心 10環' : `命中 ${ringScore} 環`;
+      spawnRippleAndMarker(localX, localY, `${Math.round(rt)} ms`, ringLabel);
+
+      currentRound++;
+      updateHUD();
+
+      if (currentRound >= TOTAL_ROUNDS) {
+        setTimeout(finishSession, 420);
+      } else {
+        scheduleNextTarget();
+      }
+    });
+
+    // Handle clicking the arena background (early shot foul or miss)
+    arena.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.overlay-card')) return;
+
+      const arenaRect = arena.getBoundingClientRect();
+      const localX = e.clientX - arenaRect.left;
+      const localY = e.clientY - arenaRect.top;
+
+      if (gameState === 'WAITING') {
+        // Early shot foul!
+        clearTimeout(waitTimerId);
+        playSound('foul');
+        arena.classList.remove('waiting');
+        arena.classList.add('foul');
+        spawnRippleAndMarker(localX, localY, '⚠️ 搶快犯規！', '本發重新計時');
+        setStatus('danger', `⚠️ 標靶尚未出現就開槍！第 ${currentRound + 1} 發將重新準備...`);
+
+        gameState = 'IDLE';
+        waitTimerId = setTimeout(() => {
+          scheduleNextTarget();
+        }, 1100);
+      } else if (gameState === 'TARGET_ACTIVE') {
+        // Clicked outside target while target is active
+        spawnRippleAndMarker(localX, localY, '', '未命中標靶！請點選靶心');
+      }
+    });
+
+    function getRankInfo(avgMs) {
+      if (avgMs < 210) return { title: '⚡ 閃電神槍手 (頂尖反射)', color: '#00f0ff' };
+      if (avgMs < 255) return { title: '🦅 特種部隊射手 (極快反應)', color: '#00e676' };
+      if (avgMs < 310) return { title: '🎯 精準狙擊手 (反應優良)', color: '#ffae00' };
+      if (avgMs < 380) return { title: '🛡️ 穩健射手 (標準反應)', color: '#d0d8e8' };
+      return { title: '🌱 靶場訓練生 (可再加速)', color: '#ff7b93' };
+    }
+
+    function finishSession() {
+      gameState = 'FINISHED';
+      playSound('finish');
+      setStatus('fire', '✅ 五次射擊測定完成！請查看統計報告');
+
+      const sum = reactionTimes.reduce((a, b) => a + b, 0);
+      const avg = sum / TOTAL_ROUNDS;
+      const best = Math.min(...reactionTimes);
+      const worst = Math.max(...reactionTimes);
+      const avgRing = accuracyScores.reduce((a, b) => a + b, 0) / TOTAL_ROUNDS;
+
+      // Standard Deviation
+      const variance = reactionTimes.reduce((acc, val) => acc + Math.pow(val - avg, 2), 0) / TOTAL_ROUNDS;
+      const sd = Math.sqrt(variance);
+
+      document.getElementById('finalAvgText').textContent = `${avg.toFixed(1)} ms`;
+      document.getElementById('bestTimeText').textContent = `${Math.round(best)} ms`;
+      document.getElementById('worstTimeText').textContent = `${Math.round(worst)} ms`;
+      document.getElementById('avgAccText').textContent = `${avgRing.toFixed(1)} 環`;
+      document.getElementById('sdText').textContent = `穩定度標準差: ±${sd.toFixed(1)} ms`;
+
+      const rank = getRankInfo(avg);
+      const rankBadge = document.getElementById('rankBadge');
+      rankBadge.textContent = rank.title;
+      rankBadge.style.borderColor = rank.color;
+      rankBadge.style.color = rank.color;
+
+      // Render 5-bar chart
+      const barsWrap = document.getElementById('barsWrap');
+      barsWrap.innerHTML = '';
+      const maxVal = Math.max(...reactionTimes, 350);
+
+      reactionTimes.forEach((rt, idx) => {
+        const heightPct = Math.max(12, Math.min(100, (rt / maxVal) * 100));
+        const col = document.createElement('div');
+        col.className = 'bar-col';
+        col.innerHTML = `
+          <span class="bar-num">${Math.round(rt)}</span>
+          <div class="bar-fill" style="height: ${heightPct}%;"></div>
+          <span class="bar-col-label">第${idx + 1}發</span>
+        `;
+        barsWrap.appendChild(col);
+      });
+
+      // Save to session history
+      sessionHistory.unshift(avg.toFixed(1));
+      if (sessionHistory.length > 6) sessionHistory.pop();
+      renderHistory();
+
+      resultCard.classList.remove('hidden');
+    }
+
+    function renderHistory() {
+      historyPills.innerHTML = '<span>歷次5發平均：</span>';
+      sessionHistory.forEach((avgStr, idx) => {
+        const pill = document.createElement('span');
+        pill.className = 'history-pill';
+        pill.textContent = `#${sessionHistory.length - idx}: ${avgStr} ms`;
+        historyPills.appendChild(pill);
+      });
+    }
+
+    // Buttons
+    startBtn.addEventListener('click', startSession);
+    playAgainBtn.addEventListener('click', startSession);
+    restartTopBtn.addEventListener('click', startSession);
+
+    soundToggleBtn.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundToggleBtn.textContent = soundEnabled ? '🔊 音效開啟' : '🔇 音效靜音';
+    });
+
+    copyReportBtn.addEventListener('click', () => {
+      if (reactionTimes.length < TOTAL_ROUNDS) return;
+      const avg = (reactionTimes.reduce((a, b) => a + b, 0) / TOTAL_ROUNDS).toFixed(1);
+      const listStr = reactionTimes.map((t, i) => `第${i + 1}次: ${Math.round(t)}ms`).join(', ');
+      const text = `【神槍手反應時間測定】\n${listStr}\n五次平均反應時間：${avg} ms`;
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = copyReportBtn.textContent;
+        copyReportBtn.textContent = '✅ 已複製數據！';
+        setTimeout(() => { copyReportBtn.textContent = orig; }, 1800);
+      });
+    });
+  </script>
+</body>
+</html>
